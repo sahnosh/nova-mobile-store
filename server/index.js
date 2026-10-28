@@ -1,0 +1,16 @@
+import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { mkdir, appendFile } from 'node:fs/promises';
+import { products } from './products.js';
+import { prepareOrder } from './store.js';
+const app=express(); const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+app.use(express.json({limit:'32kb'}));
+app.get('/api/products',(req,res)=>res.json(products));
+app.get('/api/health',(req,res)=>res.json({status:'ok'}));
+app.post('/api/orders',async(req,res)=>{let order; try{order=prepareOrder(req.body);}catch(error){return res.status(400).json({error:error.message});} try{await mkdir(path.join(root,'server/data'),{recursive:true}); await appendFile(path.join(root,'server/data/orders.jsonl'),JSON.stringify(order)+'\n'); res.status(201).json({id:order.id,total:order.total});}catch{res.status(500).json({error:'We could not save your order. Please try again.'});}});
+app.use('/api',(req,res)=>res.status(404).json({error:'API endpoint not found.'}));
+app.use(express.static(path.join(root,'dist')));
+app.get('*',(req,res)=>res.sendFile(path.join(root,'dist/index.html')));
+app.use((error,req,res,next)=>res.status(400).json({error:'Invalid request.'}));
+app.listen(process.env.PORT||3001,()=>console.log(`NOVA API running at http://localhost:${process.env.PORT||3001}`));
